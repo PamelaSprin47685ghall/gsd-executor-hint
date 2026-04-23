@@ -1,2 +1,4 @@
 {"id":"dd0b29d8-5111-4e9b-a1b0-eeda9a53d008","ts":"2026-04-23T07:46:09.938Z","severity":"warning","message":"Web search: Set BRAVE_API_KEY or use an Anthropic model for built-in search","source":"notify","read":false}
 {"id":"63cc1d5c-c45b-4fff-a758-d515b0b339a5","ts":"2026-04-23T07:58:16.964Z","severity":"warning","message":"Web search: Set BRAVE_API_KEY or use an Anthropic model for built-in search","source":"notify","read":false}
+{"id":"99387af7-abf1-47b9-b33e-153b7febffad","ts":"2026-04-23T08:00:04.826Z","severity":"warning","message":"Web search: Set BRAVE_API_KEY or use an Anthropic model for built-in search","source":"notify","read":false}
+{"id":"a251d1ea-632f-445f-8ac3-0972a5af43de","ts":"2026-04-23T08:03:11.311Z","severity":"warning","message":"Web search: Set BRAVE_API_KEY or use an Anthropic model for built-in search","source":"notify","read":false}

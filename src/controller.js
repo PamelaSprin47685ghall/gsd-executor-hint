@@ -4,13 +4,20 @@ import { join, resolve } from "node:path";
 
 const GSD_HOME = process.env.GSD_HOME ?? join(homedir(), ".gsd");
 
-function findRealProjectRoot(cwd) {
+/**
+ * Locate the real project root.
+ * Handles GSD worktrees by回溯 to the parent project directory.
+ */
+function getProjectRoot(cwd) {
+	if (process.env.GSD_PROJECT_ROOT) return process.env.GSD_PROJECT_ROOT;
+
 	let curr = resolve(cwd);
 	while (curr !== resolve(curr, "..")) {
-		// 识别标准的 .gsd 目录。注意：如果我们在 worktree 里，.gsd 可能是一个文件（git-link）或目录
 		if (existsSync(join(curr, ".gsd"))) {
-			// 如果当前路径包含 worktrees，说明我们在子分支，真正的 EXECUTOR.md 在三层级以上
-			if (curr.includes(join(".gsd", "worktrees"))) {
+			// Check if we are inside a GSD worktree (.gsd/worktrees/MXXX)
+			const parts = curr.split(/[/\\]/);
+			const gsdIdx = parts.lastIndexOf(".gsd");
+			if (gsdIdx !== -1 && parts[gsdIdx + 1] === "worktrees") {
 				return resolve(curr, "..", "..", "..");
 			}
 			return curr;
@@ -20,28 +27,53 @@ function findRealProjectRoot(cwd) {
 	return null;
 }
 
-function isGSDExecution(event) {
+/**
+ * Audit: Is this Turn part of GSD's autonomous execution flow?
+ * Filters out macro-planning/research phases.
+ */
+function isExecuting(event) {
 	if (!event) return false;
+	const sys = event.systemPrompt ?? "";
 	
-	// 优先信任 API 状态
-	const phase = event.api?.getPhase?.() ?? event.context?.phase;
-	if (phase) return ["executing", "verifying", "summarizing"].includes(phase);
+	// Must have GSD system context
+	if (!sys.includes("[SYSTEM CONTEXT — GSD]") && !sys.includes("## GSD - Get Shit Done")) return false;
 
-	// 降级使用特征匹配：必须包含 GSD 核心标记，且不处于研究/规划阶段
-	const sys = (event.systemPrompt ?? "").toLowerCase();
-	const isGSD = sys.includes("gsd") || sys.includes("get shit done");
-	const isMacroPhase = sys.includes("research-milestone") || sys.includes("plan-slice");
-	
-	return isGSD && !isMacroPhase;
+	// Macro/Discussion phases exclusion
+	const macroMarkers = [
+		"## UNIT: Milestone Research",
+		"## UNIT: Plan Milestone",
+		"## UNIT: Research Slice",
+		"## UNIT: Plan Slice",
+		"## UNIT: Discuss Milestone",
+		"## UNIT: Discuss Slice"
+	];
+	if (macroMarkers.some(m => sys.includes(m))) return false;
+
+	// Positive execution markers
+	const execMarkers = [
+		"## UNIT: Execute Task",
+		"## UNIT: Complete Slice",
+		"## UNIT: Complete Milestone",
+		"## UNIT: Reassess Roadmap",
+		"## UNIT: Validate Milestone",
+		"## UNIT: Run UAT",
+		"## UNIT: Replan Slice",
+		"## UNIT: Refine Slice"
+	];
+	if (execMarkers.some(m => sys.includes(m))) return true;
+
+	// Heuristic: If it has Task Plan or Verification markers
+	if (sys.includes("## Inlined Task Plan") || sys.includes("## Verification Evidence")) return true;
+
+	return false;
 }
 
 export function createExecutorHintController() {
 	return {
 		async injectHint(event) {
-			if (!isGSDExecution(event)) return;
+			if (!isExecuting(event)) return;
 
-			// 找到真正的项目根目录，解决 Worktree 找不到非 track 文件的问题
-			const root = process.env.GSD_PROJECT_ROOT ?? findRealProjectRoot(process.cwd());
+			const root = getProjectRoot(process.cwd());
 			const paths = [
 				root ? join(root, "EXECUTOR.md") : null,
 				join(GSD_HOME, "agent", "EXECUTOR.md")
@@ -53,10 +85,9 @@ export function createExecutorHintController() {
 						const hint = readFileSync(p, "utf-8").trim();
 						if (!hint) continue;
 						
-						// 注入到 System Prompt 的末尾，并增加明确的视觉分隔
 						return {
 							systemPrompt: (event.systemPrompt ?? "") + 
-								`\n\n[USER EXECUTOR HINT — ACTIVE]\n${hint}\n`
+								`\n\n[USER EXECUTOR HINT — MANDATORY]\n${hint}\n`
 						};
 					} catch { /* skip */ }
 				}
