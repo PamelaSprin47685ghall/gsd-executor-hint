@@ -14,7 +14,6 @@ function getProjectRoot(cwd) {
 	let curr = resolve(cwd);
 	while (curr !== resolve(curr, "..")) {
 		if (existsSync(join(curr, ".gsd"))) {
-			// Check if we are inside a GSD worktree (.gsd/worktrees/MXXX)
 			const parts = curr.split(/[/\\]/);
 			const gsdIdx = parts.lastIndexOf(".gsd");
 			if (gsdIdx !== -1 && parts[gsdIdx + 1] === "worktrees") {
@@ -29,41 +28,34 @@ function getProjectRoot(cwd) {
 
 /**
  * Audit: Is this Turn part of GSD's autonomous execution flow?
- * Filters out macro-planning/research phases.
  */
-function isExecuting(event) {
+function isGSDExecution(event) {
 	if (!event) return false;
-	const sys = event.systemPrompt ?? "";
 	
-	// Must have GSD system context
-	if (!sys.includes("[SYSTEM CONTEXT — GSD]") && !sys.includes("## GSD - Get Shit Done")) return false;
+	const sys = (event.systemPrompt ?? "").toLowerCase();
+	const usr = (event.prompt ?? "").toLowerCase();
 
-	// Macro/Discussion phases exclusion
-	const macroMarkers = [
-		"## UNIT: Milestone Research",
-		"## UNIT: Plan Milestone",
-		"## UNIT: Research Slice",
-		"## UNIT: Plan Slice",
-		"## UNIT: Discuss Milestone",
-		"## UNIT: Discuss Slice"
+	// 1. Check for GSD specific markers in system prompt (works if running after GSD extension)
+	if (sys.includes("gsd") || sys.includes("get shit done")) {
+		// Filter out macro-phases
+		const isMacro = sys.includes("research-milestone") || sys.includes("plan-milestone") || 
+		                sys.includes("research-slice") || sys.includes("plan-slice");
+		if (!isMacro) return true;
+	}
+
+	// 2. Check for GSD auto-mode dispatch patterns in the user prompt (works even if running before GSD extension)
+	const dispatchPatterns = [
+		"execute the next task",
+		"resume interrupted work",
+		"summarize the completed work",
+		"verify the milestone",
+		"run uat",
+		"reassess the roadmap",
+		"replan the slice",
+		"evaluate quality gates"
 	];
-	if (macroMarkers.some(m => sys.includes(m))) return false;
-
-	// Positive execution markers
-	const execMarkers = [
-		"## UNIT: Execute Task",
-		"## UNIT: Complete Slice",
-		"## UNIT: Complete Milestone",
-		"## UNIT: Reassess Roadmap",
-		"## UNIT: Validate Milestone",
-		"## UNIT: Run UAT",
-		"## UNIT: Replan Slice",
-		"## UNIT: Refine Slice"
-	];
-	if (execMarkers.some(m => sys.includes(m))) return true;
-
-	// Heuristic: If it has Task Plan or Verification markers
-	if (sys.includes("## Inlined Task Plan") || sys.includes("## Verification Evidence")) return true;
+	
+	if (dispatchPatterns.some(p => usr.includes(p))) return true;
 
 	return false;
 }
@@ -71,7 +63,7 @@ function isExecuting(event) {
 export function createExecutorHintController() {
 	return {
 		async injectHint(event) {
-			if (!isExecuting(event)) return;
+			if (!isGSDExecution(event)) return;
 
 			const root = getProjectRoot(process.cwd());
 			const paths = [
@@ -85,9 +77,10 @@ export function createExecutorHintController() {
 						const hint = readFileSync(p, "utf-8").trim();
 						if (!hint) continue;
 						
+						// Using a very distinctive and high-priority marker
 						return {
 							systemPrompt: (event.systemPrompt ?? "") + 
-								`\n\n[USER EXECUTOR HINT — MANDATORY]\n${hint}\n`
+								`\n\n# CRITICAL: EXECUTOR GUIDANCE\n${hint}\n`
 						};
 					} catch { /* skip */ }
 				}
