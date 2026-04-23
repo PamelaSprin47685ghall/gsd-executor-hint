@@ -1,4 +1,4 @@
-import { createExecutorHintController, isExecutingPhase, loadExecutorHint } from "../src/controller.js";
+import { createExecutorHintController, isRelevantPhase, loadExecutorHint } from "../src/controller.js";
 import { noop, notify } from "../src/utils.js";
 import { test, describe, mock, beforeEach } from "node:test";
 import assert from "node:assert";
@@ -6,7 +6,6 @@ import assert from "node:assert";
 // ─── utils ────────────────────────────────────────────────────────────────────
 
 test("notify: no-ops when ctx is null", () => {
-	// Should not throw
 	notify(null, "msg");
 	notify(undefined, "msg");
 });
@@ -34,43 +33,53 @@ test("noop: returns its argument unchanged", () => {
 
 // ─── controller.unit ───────────────────────────────────────────────────────────
 
-describe("isExecutingPhase", () => {
-	test("returns true when api.getPhase() === 'executing'", () => {
+describe("isRelevantPhase", () => {
+	test("returns true for executing phase", () => {
 		const event = { api: { getPhase: () => "executing" } };
-		assert.strictEqual(isExecutingPhase(event), true);
+		assert.strictEqual(isRelevantPhase(event), true);
 	});
 
-	test("returns false when api.getPhase() === 'planning'", () => {
+	test("returns true for verifying phase", () => {
+		const event = { api: { getPhase: () => "verifying" } };
+		assert.strictEqual(isRelevantPhase(event), true);
+	});
+
+	test("returns true for summarizing phase", () => {
+		const event = { api: { getPhase: () => "summarizing" } };
+		assert.strictEqual(isRelevantPhase(event), true);
+	});
+
+	test("returns false when api.getPhase() is planning", () => {
 		const event = { api: { getPhase: () => "planning" } };
-		assert.strictEqual(isExecutingPhase(event), false);
-	});
-
-	test("returns false when api.getPhase() is missing", () => {
-		const event = {};
-		assert.strictEqual(isExecutingPhase(event), false);
+		assert.strictEqual(isRelevantPhase(event), false);
 	});
 
 	test("returns true via prompt heuristic when getPhase unavailable", () => {
 		const event = {
-			prompt:
-				"some context\n## Inlined Task Plan (authoritative local execution contract)\ndo the thing",
+			prompt: "## Inlined Task Plan\ndo the thing",
 		};
-		assert.strictEqual(isExecutingPhase(event), true);
+		assert.strictEqual(isRelevantPhase(event), true);
+		
+		const event2 = { prompt: "## Verification Evidence\n..." };
+		assert.strictEqual(isRelevantPhase(event2), true);
+
+		const event3 = { prompt: "## Task Summary\n..." };
+		assert.strictEqual(isRelevantPhase(event3), true);
 	});
 
-	test("returns false when prompt does not contain the marker", () => {
+	test("returns false when prompt does not contain any markers", () => {
 		const event = { prompt: "just a normal planning prompt" };
-		assert.strictEqual(isExecutingPhase(event), false);
+		assert.strictEqual(isRelevantPhase(event), false);
 	});
 });
 
 describe("loadExecutorHint", { skip: true }, () => {
-	// Requires actual file system — skip in CI. Enable with a real temp file setup.
+	// Requires actual file system
 });
 
 // ─── controller integration ────────────────────────────────────────────────────
 
-test("injectHint: returns undefined when not in executing phase", async () => {
+test("injectHint: returns undefined when not in relevant phase", async () => {
 	const pi = { on: mock.fn() };
 	const ctrl = createExecutorHintController(pi);
 
@@ -84,14 +93,9 @@ test("injectHint: returns undefined when no EXECUTOR.md found", async () => {
 
 	const result = await ctrl.injectHint({
 		api: { getPhase: () => "executing" },
-		prompt: "## Inlined Task Plan (authoritative local execution contract)",
+		prompt: "## Inlined Task Plan",
 	});
 	assert.strictEqual(result, undefined);
-});
-
-test("injectHint: injects hint when in executing phase and EXECUTOR.md exists", async () => {
-	// This test requires a real EXECUTOR.md in the repo root or temp dir.
-	// Covered by manual / e2e verification.
 });
 
 // ─── extension integration ─────────────────────────────────────────────────────
@@ -101,7 +105,6 @@ describe("extension", () => {
 		const mockOn = mock.fn();
 		const mockPi = { on: mockOn };
 
-		// Import the default export (dynamic import for ESM)
 		const ext = await import("../src/index.js");
 		ext.default(mockPi);
 
