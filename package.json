@@ -1,7 +1,7 @@
 {
 	"name": "gsd-executor-hint",
-	"version": "2.0.0",
-	"description": "Always-on SYSTEM.md injection for GSD/Pi",
+	"version": "2.2.0",
+	"description": "Inject SYSTEM.md as the first user message of every session",
 	"type": "module",
 	"main": "index.js",
 	"keywords": ["pi-package"],
