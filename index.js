@@ -40,20 +40,15 @@ function loadHint() {
 }
 
 /**
- * GSD Executor Hint - Final Pure Version
- * 
- * Strategy:
- * 1. Hook into 'session_start' (fires once when a new unit or session begins).
- * 2. Directly send a custom message to the conversation history.
+ * GSD Executor Hint - Final Final Version
  */
 export default function executorHint(pi) {
-	pi.on("session_start", async () => {
+	const inject = async (context) => {
 		try {
 			const hint = loadHint();
 			if (!hint) return;
 
-			// Directly inject the hint as a visible user message at the start of the session.
-			// This matches: "send one user message after system prompt, don't add later".
+			// Send visible user message at the very start of ANY session
 			pi.sendMessage({
 				customType: "gsd-executor-hint",
 				content: `[MANDATORY EXECUTOR GUIDANCE]\n${hint}`,
@@ -61,10 +56,20 @@ export default function executorHint(pi) {
 			}, { triggerTurn: false });
 			
 			if (typeof pi.log === "function") {
-				pi.log("Executor Hint injected into session start.");
+				pi.log(`Executor Hint injected (${context}).`);
 			}
 		} catch (err) {
-			console.error(`[executor-hint] Error: ${err.message}`);
+			console.error(`[executor-hint] ${context} error: ${err.message}`);
+		}
+	};
+
+	// 1. Initial process start (Interactive startup or Subagent process)
+	pi.on("session_start", () => inject("session_start"));
+
+	// 2. GSD Auto Mode unit transitions (New unit = New session in same process)
+	pi.on("session_switch", (event) => {
+		if (event.reason === "new") {
+			inject("session_switch:new");
 		}
 	});
 }
