@@ -1,0 +1,17 @@
+{
+  "name": "gsd-executor-hint",
+  "version": "1.0.0",
+  "description": "GSD ecosystem extension that injects EXECUTOR.md during the executing phase",
+  "main": "index.js",
+  "type": "module",
+  "gsd": {
+    "extension": true
+  },
+  "pi": {
+    "extensions": [
+      "index.js"
+    ]
+  },
+  "keywords": ["gsd", "ecosystem", "extension"],
+  "license": "MIT"
+}
