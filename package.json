@@ -1,6 +1,6 @@
 {
 	"name": "gsd-executor-hint",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Inject EXECUTOR.md into system prompt during GSD execution",
 	"type": "module",
 	"main": "src/index.js",
@@ -8,9 +8,6 @@
 	"gsd": { "extension": true },
 	"pi": {
 		"extensions": ["./src/index.js"]
-	},
-	"peerDependencies": {
-		"@gsd/pi-coding-agent": "*"
 	},
 	"license": "MIT"
 }
