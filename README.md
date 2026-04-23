@@ -1,46 +1,15 @@
-# GSD Executor Hint Extension
+# GSD Executor Hint
 
-Automatically injects `EXECUTOR.md` into the system prompt whenever GSD auto-mode is in the **executing** phase (covers both sequential execute-task and reactive-execute dispatch).
-
-## What it does
-
-- Detects the executing phase via `api.getPhase()` (GSD ecosystem) or prompt heuristics (standard pi).
-- Loads `EXECUTOR.md` from disk, with project-level takes precedence over global.
-- Injects the hint as a marked block at the end of the system prompt.
-- Shows a one-time notification when the extension loads.
-
-## EXECUTOR.md resolution order
-
-1. **Project-level:** `{cwd}/EXECUTOR.md`
-2. **Global-level:** `~/.gsd/agent/EXECUTOR.md`
+Automatically injects `EXECUTOR.md` into the system prompt during GSD execution phases.
 
 ## Install
 
-Place this folder in one of these locations:
-
-- Global: `~/.pi/agent/extensions/gsd-executor-hint/`
-- Project-local: `.gsd/extensions/gsd-executor-hint/`
-
-Then reload GSD:
-
 ```bash
-/reload
+gsd install <path-to-this-repo>
 ```
 
-## Project structure
+## Configuration
 
-```
-src/
-  constants.js    # LOADED_MESSAGE
-  utils.js        # notify helper, noop
-  controller.js   # Phase detection, hint loading, injection logic
-  index.js        # Plugin entry point
-test/
-  test.js         # Unit + integration tests
-```
-
-## Test
-
-```bash
-npm test
-```
+The plugin searches for `EXECUTOR.md` in:
+1. Project root (where `.gsd/` is located)
+2. Global config (`~/.gsd/agent/EXECUTOR.md`)

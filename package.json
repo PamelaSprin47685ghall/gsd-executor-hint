@@ -1,15 +1,16 @@
 {
 	"name": "gsd-executor-hint",
-	"version": "1.0.0",
-	"description": "Automatically inject EXECUTOR.md into the system prompt during the GSD executing phase",
+	"version": "1.0.2",
+	"description": "Inject EXECUTOR.md into system prompt during GSD execution",
 	"type": "module",
 	"main": "src/index.js",
-	"scripts": {
-		"test": "node --test test/test.js"
-	},
+	"keywords": ["pi-package"],
+	"gsd": { "extension": true },
 	"pi": {
 		"extensions": ["./src/index.js"]
 	},
-	"keywords": ["gsd", "ecosystem", "extension"],
+	"peerDependencies": {
+		"@gsd/pi-coding-agent": "*"
+	},
 	"license": "MIT"
 }
