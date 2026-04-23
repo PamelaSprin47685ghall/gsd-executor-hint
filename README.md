@@ -1,41 +1,46 @@
-# gsd-executor-hint
+# GSD Executor Hint Extension
 
-GSD Ecosystem Extension — injects `EXECUTOR.md` into the system prompt during the **executing** phase.
+Automatically injects `EXECUTOR.md` into the system prompt whenever GSD auto-mode is in the **executing** phase (covers both sequential execute-task and reactive-execute dispatch).
 
 ## What it does
 
-When GSD auto-mode dispatches an `execute-task` (or `reactive-execute`) unit, this extension reads `EXECUTOR.md` and appends its contents to the system prompt. This lets you place user-specific coding conventions, guard-rails, or style guides that apply **only while code is being written**, without bloating planning or research turns.
+- Detects the executing phase via `api.getPhase()` (GSD ecosystem) or prompt heuristics (standard pi).
+- Loads `EXECUTOR.md` from disk, with project-level takes precedence over global.
+- Injects the hint as a marked block at the end of the system prompt.
+- Shows a one-time notification when the extension loads.
 
-## File resolution
+## EXECUTOR.md resolution order
 
-1. **Project-level**: `{cwd}/EXECUTOR.md`
-2. **Global-level**: `~/.gsd/agent/EXECUTOR.md`
-
-The first file found wins. If neither exists the extension is silently skipped.
+1. **Project-level:** `{cwd}/EXECUTOR.md`
+2. **Global-level:** `~/.gsd/agent/EXECUTOR.md`
 
 ## Install
 
+Place this folder in one of these locations:
+
+- Global: `~/.pi/agent/extensions/gsd-executor-hint/`
+- Project-local: `.gsd/extensions/gsd-executor-hint/`
+
+Then reload GSD:
+
 ```bash
-cd /path/to/your/project
-gsd extensions install /path/to/gsd-executor-hint
+/reload
 ```
 
-Then restart GSD to activate.
+## Project structure
 
-## Usage
-
-Create an `EXECUTOR.md` in your project root (or in `~/.gsd/agent/EXECUTOR.md` for cross-project hints):
-
-```markdown
-# Executor Instructions
-
-- Always run the test suite before claiming a task is complete.
-- Prefer `async/await` over raw Promises.
-- When editing TypeScript, keep strict-null-checks compliance in mind.
+```
+src/
+  constants.js    # LOADED_MESSAGE
+  utils.js        # notify helper, noop
+  controller.js   # Phase detection, hint loading, injection logic
+  index.js        # Plugin entry point
+test/
+  test.js         # Unit + integration tests
 ```
 
-The next time GSD auto-mode enters the **executing** phase, these instructions will appear in the system prompt.
+## Test
 
-## Why a separate file instead of AGENTS.md?
-
-`AGENTS.md` (and `CLAUDE.md`) are loaded by the core agent on **every** turn — planning, research, discussion, and execution. `EXECUTOR.md` is scoped to the execution phase only, keeping planning prompts lean while giving the executor full context.
+```bash
+npm test
+```
