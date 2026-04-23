@@ -23,42 +23,48 @@ function getProjectRoot(cwd) {
 }
 
 /**
- * Strict execution phase detection.
- * Targets only implementation/completion units, ignoring planning/research.
+ * Audit GSD 2.0 system prompts for precise phase detection.
  */
-function isExecuting(event) {
+function isExecutionTurn(event) {
 	if (!event) return false;
-	
-	const sys = (event.systemPrompt ?? "").toLowerCase();
+	const sys = event.systemPrompt ?? "";
 	const usr = (event.prompt ?? "").toLowerCase();
 
-	// 1. Explicit GSD unit patterns in user instruction (Highest reliability)
-	const execPatterns = [
-		"execute the next task",
-		"resume interrupted work",
-		"summarize the completed work",
-		"verify the milestone",
-		"run uat",
-		"reassess the roadmap",
-		"replan the slice",
-		"evaluate quality gates"
+	// --- 1. POSITIVE MATCHES (Execution/Verification/Completion) ---
+	
+	// Exact headers from GSD 2.0 templates
+	const execHeaders = [
+		"## UNIT: Execute Task",
+		"## UNIT: Complete Slice",
+		"## UNIT: Complete Milestone",
+		"## UNIT: Validate Milestone",
+		"## UNIT: Run UAT",
+		"# Reactive Task Execution"
 	];
-	if (execPatterns.some(p => usr.includes(p))) return true;
+	if (execHeaders.some(h => sys.includes(h))) return true;
 
-	// 2. System prompt check (Fallback for some subagent flows)
-	if (sys.includes("[system context — gsd]") || sys.includes("## gsd - get shit done")) {
-		// Mandatory exclusions: planning and research phases are NOT execution
-		const macroMarkers = [
-			"research-milestone", "plan-milestone", 
-			"research-slice", "plan-slice",
-			"discuss-milestone", "discuss-slice"
-		];
-		if (macroMarkers.some(m => sys.includes(m))) return false;
-
-		// Positive execution signals in system prompt
-		const execMarkers = ["execute task", "complete slice", "validate milestone", "run uat"];
-		if (execMarkers.some(m => sys.includes(m))) return true;
+	// User prompt patterns for subagents or direct dispatch
+	if (usr.includes("execute the next task") || 
+	    usr.includes("summarize the completed work") ||
+	    usr.includes("run uat") ||
+	    usr.includes("verify the milestone")) {
+		return true;
 	}
+
+	// --- 2. NEGATIVE MATCHES (Planning/Research/Discussion) ---
+	
+	const planHeaders = [
+		"## UNIT: Plan Milestone",
+		"## UNIT: Plan Slice",
+		"## UNIT: Research Milestone",
+		"## UNIT: Research Slice",
+		"## UNIT: Discuss Milestone",
+		"## UNIT: Discuss Slice",
+		"## UNIT: Reassess Roadmap",
+		"## UNIT: Replan Slice",
+		"## UNIT: Refine Slice"
+	];
+	if (planHeaders.some(h => sys.includes(h))) return false;
 
 	return false;
 }
@@ -75,31 +81,31 @@ function loadHint() {
 			try {
 				const content = readFileSync(p, "utf-8").trim();
 				if (content) return content;
-			} catch { /* skip */ }
+			} catch { /* ignore */ }
 		}
 	}
 	return null;
 }
 
 /**
- * GSD Executor Hint - Precise Injection Version
+ * GSD Executor Hint - Production Precision Version
  */
 export default function executorHint(pi) {
 	pi.on("before_agent_start", async (event, ctx) => {
 		try {
 			const sessionId = ctx.sessionManager.getSessionId();
 			
-			// Fulfills: "send one user message at the start, don't add later"
+			// Inject only once per session to fulfill "send one message at start"
 			if (seenSessions.has(sessionId)) return;
 
-			if (isExecuting(event)) {
+			if (isExecutionTurn(event)) {
 				const hint = loadHint();
 				if (!hint) return;
 
 				seenSessions.add(sessionId);
 				
 				if (typeof pi.log === "function") {
-					pi.log(`Executor Hint injected for session ${sessionId}`);
+					pi.log(`[executor-hint] Injected for unit ${sessionId}`);
 				}
 
 				return {
@@ -111,7 +117,7 @@ export default function executorHint(pi) {
 				};
 			}
 		} catch (err) {
-			console.error(`[executor-hint] Hook error: ${err.message}`);
+			console.error(`[executor-hint] Critical error: ${err.message}`);
 		}
 	});
 }
