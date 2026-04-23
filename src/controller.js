@@ -35,15 +35,14 @@ function isGSDExecution(event) {
 	const sys = (event.systemPrompt ?? "").toLowerCase();
 	const usr = (event.prompt ?? "").toLowerCase();
 
-	// 1. Check for GSD specific markers in system prompt (works if running after GSD extension)
+	// 1. Check for GSD specific markers in system prompt
 	if (sys.includes("gsd") || sys.includes("get shit done")) {
-		// Filter out macro-phases
 		const isMacro = sys.includes("research-milestone") || sys.includes("plan-milestone") || 
 		                sys.includes("research-slice") || sys.includes("plan-slice");
 		if (!isMacro) return true;
 	}
 
-	// 2. Check for GSD auto-mode dispatch patterns in the user prompt (works even if running before GSD extension)
+	// 2. Check for GSD auto-mode dispatch patterns in the user prompt
 	const dispatchPatterns = [
 		"execute the next task",
 		"resume interrupted work",
@@ -77,10 +76,23 @@ export function createExecutorHintController() {
 						const hint = readFileSync(p, "utf-8").trim();
 						if (!hint) continue;
 						
-						// Using a very distinctive and high-priority marker
+						/**
+						 * STRATEGY CHANGE: 
+						 * Instead of only patching the systemPrompt (which can be 30k+ chars),
+						 * we also inject a high-priority context MESSAGE.
+						 * Standard Pi Extensions collect ALL messages returned by handlers.
+						 */
+						const block = `\n\n# MANDATORY EXECUTOR GUIDANCE\n${hint}\n`;
+						
 						return {
-							systemPrompt: (event.systemPrompt ?? "") + 
-								`\n\n# CRITICAL: EXECUTOR GUIDANCE\n${hint}\n`
+							// Still patch systemPrompt for baseline behavior
+							systemPrompt: (event.systemPrompt ?? "") + block,
+							// Inject a hidden user message at the very end of history for maximum attention
+							message: {
+								customType: "gsd-executor-hint",
+								content: `[USER EXECUTOR HINT — MUST FOLLOW]\n${hint}`,
+								display: false // Hidden from TUI
+							}
 						};
 					} catch { /* skip */ }
 				}
