@@ -38,6 +38,23 @@ function loadExecutorHint(cwd) {
 }
 
 /**
+ * Detect whether the current prompt is in the GSD executing phase.
+ *
+ * When loaded as a standard pi extension (via gsd extensions install),
+ * api.getPhase() is unavailable. We fall back to prompt-content heuristics.
+ */
+function isExecutingPhase(event) {
+  // GSD ecosystem extension path (loaded from .gsd/extensions/)
+  if (typeof event.api?.getPhase === "function") {
+    return event.api.getPhase() === "executing";
+  }
+
+  // Standard pi extension path (loaded via gsd extensions install):
+  // The execute-task prompt always inlines the task plan with this header.
+  return event.prompt?.includes("## Inlined Task Plan (authoritative local execution contract)") ?? false;
+}
+
+/**
  * GSD Ecosystem Extension — Executor Hint
  *
  * Automatically injects EXECUTOR.md into the system prompt whenever GSD
@@ -46,8 +63,7 @@ function loadExecutorHint(cwd) {
  */
 export default function executorHintExtension(api) {
   api.on("before_agent_start", async (event) => {
-    const phase = api.getPhase();
-    if (phase !== "executing") {
+    if (!isExecutingPhase(event)) {
       return undefined;
     }
 
