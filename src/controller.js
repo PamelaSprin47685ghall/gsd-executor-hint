@@ -85,14 +85,13 @@ export function createExecutorHintController() {
 			const hint = loadHint();
 			if (!hint) return;
 
-			// Return as a HIDDEN USER MESSAGE (display: false)
+			// Return as a VISIBLE USER MESSAGE (display: true) for debugging.
 			// This message is added to history before the main prompt.
-			// It satisfies: "Just send one user message after system prompt".
 			return {
 				message: {
 					customType: "gsd-executor-hint",
 					content: `[MANDATORY EXECUTOR GUIDANCE]\n${hint}`,
-					display: false
+					display: true // Changed to true for debugging as requested
 				}
 			};
 		}
