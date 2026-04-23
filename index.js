@@ -6,7 +6,6 @@ const GSD_HOME = process.env.GSD_HOME ?? join(homedir(), ".gsd");
 
 function getProjectRoot(cwd) {
 	if (process.env.GSD_PROJECT_ROOT) return process.env.GSD_PROJECT_ROOT;
-
 	let curr = resolve(cwd);
 	while (curr !== resolve(curr, "..")) {
 		if (existsSync(join(curr, ".gsd"))) {
@@ -20,13 +19,6 @@ function getProjectRoot(cwd) {
 		curr = resolve(curr, "..");
 	}
 	return null;
-}
-
-/**
- * BRUTE FORCE: Just check if we are in a GSD project.
- */
-function isGSDProject() {
-	return getProjectRoot(process.cwd()) !== null;
 }
 
 function loadHint() {
@@ -47,21 +39,32 @@ function loadHint() {
 	return null;
 }
 
-export function createExecutorHintController() {
-	return {
-		async getHintMessage() {
-			if (!isGSDProject()) return;
-
+/**
+ * GSD Executor Hint - Final Pure Version
+ * 
+ * Strategy:
+ * 1. Hook into 'session_start' (fires once when a new unit or session begins).
+ * 2. Directly send a custom message to the conversation history.
+ */
+export default function executorHint(pi) {
+	pi.on("session_start", async () => {
+		try {
 			const hint = loadHint();
 			if (!hint) return;
 
-			return {
-				message: {
-					customType: "gsd-executor-hint",
-					content: `[MANDATORY EXECUTOR GUIDANCE]\n${hint}`,
-					display: true 
-				}
-			};
+			// Directly inject the hint as a visible user message at the start of the session.
+			// This matches: "send one user message after system prompt, don't add later".
+			pi.sendMessage({
+				customType: "gsd-executor-hint",
+				content: `[MANDATORY EXECUTOR GUIDANCE]\n${hint}`,
+				display: true
+			}, { triggerTurn: false });
+			
+			if (typeof pi.log === "function") {
+				pi.log("Executor Hint injected into session start.");
+			}
+		} catch (err) {
+			console.error(`[executor-hint] Error: ${err.message}`);
 		}
-	};
+	});
 }
