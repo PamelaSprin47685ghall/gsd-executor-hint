@@ -1,7 +1,7 @@
 {
 	"name": "gsd-executor-hint",
-	"version": "1.2.4",
-	"description": "Inject EXECUTOR.md into system prompt during GSD execution",
+	"version": "2.0.0",
+	"description": "Always-on SYSTEM.md injection for GSD/Pi",
 	"type": "module",
 	"main": "index.js",
 	"keywords": ["pi-package"],

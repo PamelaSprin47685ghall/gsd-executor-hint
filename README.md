@@ -1,15 +1,7 @@
-# GSD Executor Hint
+# GSD Always-On System Prompt
 
-Automatically injects `EXECUTOR.md` into the system prompt during GSD execution phases.
+Appends `SYSTEM.md` to the system prompt for every turn.
 
-## Install
-
-```bash
-gsd install <path-to-this-repo>
-```
-
-## Configuration
-
-The plugin searches for `EXECUTOR.md` in:
-1. Project root (where `.gsd/` is located)
-2. Global config (`~/.gsd/agent/EXECUTOR.md`)
+## Files
+1. Project root: `SYSTEM.md` (where `.gsd/` is located)
+2. Global: `~/.gsd/agent/SYSTEM.md`
