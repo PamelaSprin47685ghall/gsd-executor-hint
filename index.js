@@ -40,38 +40,41 @@ function loadHint() {
 }
 
 /**
- * GSD System Prompt Injection (v2.2.0)
+ * GSD System Prompt Injection (v2.3.0)
  * 
- * Strategy:
- * Inject SYSTEM.md as the absolute FIRST user message of every session.
- * This ensures high visibility, session-wide persistence, and 100% reliability.
+ * Logic:
+ * 1. Listen for session_start and session_switch (most reliable for GSD sessions).
+ * 2. Send SYSTEM.md as the first user message.
  */
 export default function(pi) {
-	pi.on("before_agent_start", async (event, ctx) => {
-		try {
-			const sessionId = ctx.sessionManager.getSessionId();
-			
-			// Only once per session (first turn)
-			if (seenSessions.has(sessionId)) return;
+	const inject = async (sessionId) => {
+		if (!sessionId || seenSessions.has(sessionId)) return;
 
-			const hint = loadHint();
-			if (hint) {
-				seenSessions.add(sessionId);
+		const hint = loadHint();
+		if (!hint) return;
 
-				if (typeof pi.log === "function") {
-					pi.log(`SYSTEM.md injected as first message for ${sessionId}`);
-				}
+		seenSessions.add(sessionId);
 
-				return {
-					message: {
-						customType: "gsd-system-hint",
-						content: `[SYSTEM.md — INITIAL GUIDANCE]\n${hint}`,
-						display: true 
-					}
-				};
-			}
-		} catch (err) {
-			// Silent fail
+		// Triggered at the absolute start of the session.
+		// This puts the message at the top of history.
+		pi.sendMessage({
+			customType: "gsd-system-hint",
+			content: `[SYSTEM.md — INITIAL GUIDANCE]\n${hint}`,
+			display: true 
+		}, { triggerTurn: false });
+
+		if (typeof pi.log === "function") {
+			pi.log(`SYSTEM.md injected for session ${sessionId}`);
+		}
+	};
+
+	pi.on("session_start", async (event, ctx) => {
+		await inject(ctx.sessionManager.getSessionId());
+	});
+
+	pi.on("session_switch", async (event, ctx) => {
+		if (event.reason === "new") {
+			await inject(ctx.sessionManager.getSessionId());
 		}
 	});
 }

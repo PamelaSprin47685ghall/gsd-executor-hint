@@ -1,6 +1,6 @@
 {
 	"name": "gsd-executor-hint",
-	"version": "2.2.0",
+	"version": "2.3.0",
 	"description": "Inject SYSTEM.md as the first user message of every session",
 	"type": "module",
 	"main": "index.js",
