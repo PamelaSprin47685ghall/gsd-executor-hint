@@ -6,6 +6,6 @@
   "tier": "community",
   "requires": { "platform": "any" },
   "provides": {
-    "hooks": ["context"]
+    "hooks": ["before_agent_start"]
   }
 }

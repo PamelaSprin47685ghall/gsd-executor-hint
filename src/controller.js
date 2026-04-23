@@ -6,7 +6,7 @@ const GSD_HOME = process.env.GSD_HOME ?? join(homedir(), ".gsd");
 
 /**
  * Locate the real project root.
- * Handles GSD worktrees by回溯 to the parent project directory.
+ * Handles GSD worktrees by backtracking to the parent project directory.
  */
 function getProjectRoot(cwd) {
 	if (process.env.GSD_PROJECT_ROOT) return process.env.GSD_PROJECT_ROOT;
@@ -27,16 +27,36 @@ function getProjectRoot(cwd) {
 }
 
 /**
- * Specifically check for task-level execution prompts.
+ * Audit: Is this prompt part of GSD's autonomous execution flow?
  */
-function isTaskExecutionMessage(text) {
-	if (!text || typeof text !== "string") return false;
-	const t = text.toLowerCase();
-	return t.includes("execute the next task") || 
-	       t.includes("task: execute the next task") ||
-	       t.includes("resume interrupted work") ||
-	       t.includes("run uat") ||
-	       t.includes("summarize the completed work");
+function isGSDExecution(event) {
+	if (!event) return false;
+	
+	const sys = (event.systemPrompt ?? "").toLowerCase();
+	const usr = (event.prompt ?? "").toLowerCase();
+
+	// 1. Check for GSD specific markers in system prompt
+	if (sys.includes("gsd") || sys.includes("get shit done")) {
+		const isMacro = sys.includes("research-milestone") || sys.includes("plan-milestone") || 
+		                sys.includes("research-slice") || sys.includes("plan-slice");
+		if (!isMacro) return true;
+	}
+
+	// 2. Check for GSD auto-mode dispatch patterns in the user prompt
+	const dispatchPatterns = [
+		"execute the next task",
+		"resume interrupted work",
+		"summarize the completed work",
+		"verify the milestone",
+		"run uat",
+		"reassess the roadmap",
+		"replan the slice",
+		"evaluate quality gates"
+	];
+	
+	if (dispatchPatterns.some(p => usr.includes(p))) return true;
+
+	return false;
 }
 
 function loadHint() {
@@ -59,59 +79,22 @@ function loadHint() {
 
 export function createExecutorHintController() {
 	return {
-		/**
-		 * The Ultimate Fix: Hook into the 'context' event.
-		 * This fires right before the LLM call and allows mutating the full message history.
-		 */
-		async patchContext(event) {
-			const messages = event.messages;
-			if (!Array.isArray(messages) || messages.length === 0) return;
+		async getHintMessage(event) {
+			if (!isGSDExecution(event)) return;
 
-			// 1. Detect if this is a GSD execution turn
-			// We look for the GSD task instruction in the messages
-			let isGSDTurn = false;
-			let lastUserMsgIdx = -1;
-
-			for (let i = messages.length - 1; i >= 0; i--) {
-				const msg = messages[i];
-				if (msg.role === "user") {
-					if (lastUserMsgIdx === -1) lastUserMsgIdx = i;
-					
-					// GSD task prompts are distinctive
-					const content = Array.isArray(msg.content) ? msg.content[0]?.text : msg.content;
-					if (isTaskExecutionMessage(content)) {
-						isGSDTurn = true;
-						break;
-					}
-				}
-			}
-
-			if (!isGSDTurn || lastUserMsgIdx === -1) return;
-
-			// 2. Load the hint
 			const hint = loadHint();
 			if (!hint) return;
 
-			// 3. Inject hint into the LAST user message for maximum attention
-			// We clone the message to avoid side effects
-			const newMessages = [...messages];
-			const lastMsg = { ...newMessages[lastUserMsgIdx] };
-			
-			const hintBlock = `\n\n[MANDATORY EXECUTOR HINT]\n${hint}\n`;
-
-			if (Array.isArray(lastMsg.content)) {
-				const textPart = lastMsg.content.find(c => c.type === "text");
-				if (textPart) {
-					textPart.text += hintBlock;
-				} else {
-					lastMsg.content.push({ type: "text", text: hintBlock });
+			// Return as a HIDDEN USER MESSAGE (display: false)
+			// This message is added to history before the main prompt.
+			// It satisfies: "Just send one user message after system prompt".
+			return {
+				message: {
+					customType: "gsd-executor-hint",
+					content: `[MANDATORY EXECUTOR GUIDANCE]\n${hint}`,
+					display: false
 				}
-			} else {
-				lastMsg.content = (lastMsg.content ?? "") + hintBlock;
-			}
-
-			newMessages[lastUserMsgIdx] = lastMsg;
-			return { messages: newMessages };
+			};
 		}
 	};
 }
